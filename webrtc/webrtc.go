@@ -52,14 +52,26 @@ func CreateWebRTCConnection(offerStr, streamKey string, destination structs.Dest
 	m := webrtc.MediaEngine{}
 
 	// Setup the codecs you want to use.
+	log.Println("Registering Video Codec")
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/h264", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: "video/h264",
+			ClockRate: 90000,
+			Channels: 0,
+			SDPFmtpLine: "",
+			RTCPFeedback: nil},
 		PayloadType:        102,
 	}, webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
+	log.Println("Registering Audio Codec")
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/opus", ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: "audio/opus",
+			ClockRate: 48000,
+			Channels: 0,
+			SDPFmtpLine: "",
+			RTCPFeedback: nil},
 		PayloadType:        111,
 	}, webrtc.RTPCodecTypeAudio); err != nil {
 		panic(err)
@@ -111,16 +123,23 @@ func CreateWebRTCConnection(offerStr, streamKey string, destination structs.Dest
 		}
 
 		var sdpFile = "sdp/" + streamKey + ".sdp"
-		errWrite := WriteToFile(goDir + "/" + sdpFile,
-		"v=0\n" +
+
+		sdpString :="v=0\n" +
 		 "o=- 0 0 IN IP4 127.0.0.1\n" +
 		 "s=Pion WebRTC\n" +
 		 "c=IN IP4 127.0.0.1\n" +
-		 "t=0 0\n" +
-		 "m=audio " + strconv.Itoa( destination.AudioPort) +  " RTP/AVP 111\n" +
-		 "a=rtpmap:111 OPUS/48000/2\n" +
-		 "m=video " + strconv.Itoa( destination.VideoPort) + " RTP/AVP 102\n" +
-		 "a=rtpmap:102 H264/90000")
+		 "t=0 0\n"
+
+		if destination.AudioEnable {
+			sdpString += "m=audio " + strconv.Itoa( destination.AudioPort) +  " RTP/AVP 111\n" +
+				"a=rtpmap:111 OPUS/48000/2\n"
+		}
+		if destination.VideoEnable {
+			sdpString += "m=video " + strconv.Itoa( destination.VideoPort) + " RTP/AVP 102\n" +
+				"a=rtpmap:102 H264/90000\n"
+		}
+
+		errWrite := WriteToFile(goDir + "/" + sdpFile, string(sdpString))
 
 		if errWrite != nil {
 			log.Fatal(errWrite)
@@ -151,7 +170,7 @@ func CreateWebRTCConnection(offerStr, streamKey string, destination structs.Dest
 				}
 			}(c.conn)
 		}
-
+		log.Println("tada")
 		ffmpeg.StartFFmpeg(ctx, streamKey, sdpFile, destination)
 
 		// Set a handler for when a new remote track starts, this handler will forward data to

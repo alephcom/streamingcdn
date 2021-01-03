@@ -13,7 +13,7 @@ import (
 func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, destination structs.Destination ) {
 
 	log.Println("StreamKey: " + streamKey +
-		"sdpFile: "+ sdpFile +
+		" sdpFile: "+ sdpFile +
 		" outputType: " + destination.DestinationType +
 		" outputLocation: " + destination.DestinationUrl +
 		" outputFormat: " + destination.DestinationFormat)
@@ -22,6 +22,7 @@ func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, destinat
 	ffmpeg := exec.CommandContext(ctx,"");
 
 	if destination.DestinationType == "hls" {
+		log.Println("Output to HLS");
 		goDir, _ := os.Getwd()
 		errDir := os.MkdirAll("vid/"+streamKey, 0755)
 		if errDir != nil {
@@ -47,6 +48,7 @@ func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, destinat
 			"-hls_time", "4", "-hls_playlist_type", "event",
 			"-hls_segment_filename", targetPath+"/"+"video_%v_%03d.ts", targetPath+"/"+"quality_%v.m3u8") //not creating master and different resolution playlist*/
 	} else if destination.DestinationType == "rtmp" {
+		log.Println("Output to RTMP");
 		ffmpeg = exec.CommandContext(ctx, "ffmpeg", "-protocol_whitelist", "" +
 			"file,udp,rtp", "-i", sdpFile,
 			"-map", "0:v:0", "-map", "0:a:0",
@@ -65,8 +67,9 @@ func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, destinat
 			//"-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2 v:3,a:3",
 			"-f", destination.DestinationFormat, destination.DestinationUrl)
 	} else if destination.DestinationType == "icecast" {
+		log.Println("Output to Icecast");
 		ffmpeg = exec.CommandContext(ctx, "ffmpeg",
-			"-protocol_whitelist", "file,udp,rtp", "-i", "rtp-forwarder.sdp",  "-c:a", "libmp3lame", "-ac", "1", "-ar", "48000", "-vn",
+			"-protocol_whitelist", "file,udp,rtp", "-i", sdpFile,  "-c:a", "libmp3lame", "-ac", "1", "-ar", "48000", "-vn",
 			"-f", destination.DestinationFormat, destination.DestinationUrl) //not creating master and different resolution playlist
 	}
 

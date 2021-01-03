@@ -50,7 +50,7 @@ func HTTPSDPServer(r *httprouter.Router) {
 		if readErr != nil {
 			log.Fatal(readErr)
 		}
-		log.Println(body)
+		log.Println(string(body))
 
 		destination := structs.Destination{}
 		jsonErr := json.Unmarshal(body, &destination)
