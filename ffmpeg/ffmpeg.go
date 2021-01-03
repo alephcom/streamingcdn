@@ -4,21 +4,24 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/alephcom/streamingcdn/structs"
 	"log"
 	"os"
 	"os/exec"
 )
 
-func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, outputType string, outputLocation string, outputFormat string ) {
+func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, destination structs.Destination ) {
+
 	log.Println("StreamKey: " + streamKey +
 		"sdpFile: "+ sdpFile +
-		" outputType: " + outputType +
-		" outputLocation: " + outputLocation +
-		" outputFormat: " + outputFormat)
+		" outputType: " + destination.DestinationType +
+		" outputLocation: " + destination.DestinationUrl +
+		" outputFormat: " + destination.DestinationFormat)
+
 	targetPath := ""
 	ffmpeg := exec.CommandContext(ctx,"");
-	log.Println("tada")
-	if outputType == "hls" {
+
+	if destination.DestinationType == "hls" {
 		goDir, _ := os.Getwd()
 		errDir := os.MkdirAll("vid/"+streamKey, 0755)
 		if errDir != nil {
@@ -43,7 +46,7 @@ func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, outputTy
 			"-maxrate:v:3", "5350k", "-bufsize:v:3", "7500k", "-b:v:3", "5000k", "-b:a:3", "192k", "-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2 v:3,a:3",
 			"-hls_time", "4", "-hls_playlist_type", "event",
 			"-hls_segment_filename", targetPath+"/"+"video_%v_%03d.ts", targetPath+"/"+"quality_%v.m3u8") //not creating master and different resolution playlist*/
-	} else if outputType == "rtmp" {
+	} else if destination.DestinationType == "rtmp" {
 		ffmpeg = exec.CommandContext(ctx, "ffmpeg", "-protocol_whitelist", "" +
 			"file,udp,rtp", "-i", sdpFile,
 			"-map", "0:v:0", "-map", "0:a:0",
@@ -60,12 +63,11 @@ func StartFFmpeg(ctx context.Context, streamKey string, sdpFile string, outputTy
 			//"-filter:v:2", "scale=w=1280:h=720:force_original_aspect_ratio=decrease", "-maxrate:v:2", "2996k", "-bufsize:v:2", "4200k", "-b:v:2", "2800k", "-b:a:2", "128k",
 			//"-filter:v:3", "scale=w=1920:h=1080:force_original_aspect_ratio=decrease", "-maxrate:v:3", "5350k", "-bufsize:v:3", "7500k", "-b:v:3", "5000k", "-b:a:3", "192k",
 			//"-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2 v:3,a:3",
-			"-f", outputFormat, outputLocation)
-	} else if outputType == "icecast" {
+			"-f", destination.DestinationFormat, destination.DestinationUrl)
+	} else if destination.DestinationType == "icecast" {
 		ffmpeg = exec.CommandContext(ctx, "ffmpeg",
 			"-protocol_whitelist", "file,udp,rtp", "-i", "rtp-forwarder.sdp",  "-c:a", "libmp3lame", "-ac", "1", "-ar", "48000", "-vn",
-			"-f", outputFormat,
-			outputLocation) //not creating master and different resolution playlist
+			"-f", destination.DestinationFormat, destination.DestinationUrl) //not creating master and different resolution playlist
 	}
 
 	ffmpegOut, _ := ffmpeg.StderrPipe()
