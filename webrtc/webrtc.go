@@ -3,7 +3,8 @@ package webrtc
 import (
 	"context"
 	"fmt"
-	"github.com/mohit810/streamingcdn/ffmpeg"
+	"github.com/alephcom/streamingcdn/ffmpeg"
+	"github.com/alephcom/streamingcdn/structs"
 	"io"
 	"log"
 	"net"
@@ -11,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mohit810/streamingcdn/encryptor"
+	"github.com/alephcom/streamingcdn/encryptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
@@ -38,7 +39,7 @@ func WriteToFile(filename string, data string) error {
 }
 
 // CreateWebRTCConnection function
-func CreateWebRTCConnection(offerStr, streamKey string, audioPort int, videoPort int, outputType string, outputLocation string, outputFormat string) (answer webrtc.SessionDescription, err error) {
+func CreateWebRTCConnection(offerStr, streamKey string, destination structs.Destination) (answer webrtc.SessionDescription, err error) {
 
 	defer func() {
 		if e, ok := recover().(error); ok {
@@ -116,9 +117,9 @@ func CreateWebRTCConnection(offerStr, streamKey string, audioPort int, videoPort
 		 "s=Pion WebRTC\n" +
 		 "c=IN IP4 127.0.0.1\n" +
 		 "t=0 0\n" +
-		 "m=audio " + strconv.Itoa( audioPort) +  " RTP/AVP 111\n" +
+		 "m=audio " + strconv.Itoa( destination.AudioPort) +  " RTP/AVP 111\n" +
 		 "a=rtpmap:111 OPUS/48000/2\n" +
-		 "m=video " + strconv.Itoa( videoPort) + " RTP/AVP 102\n" +
+		 "m=video " + strconv.Itoa( destination.VideoPort) + " RTP/AVP 102\n" +
 		 "a=rtpmap:102 H264/90000")
 
 		if errWrite != nil {
@@ -127,8 +128,8 @@ func CreateWebRTCConnection(offerStr, streamKey string, audioPort int, videoPort
 
 		// Prepare udp conns
 		udpConns := map[string]*udpConn{
-			"audio": {port: audioPort},
-			"video": {port: videoPort},
+			"audio": {port: destination.AudioPort},
+			"video": {port: destination.VideoPort},
 		}
 
 		for _, c := range udpConns {
@@ -151,7 +152,7 @@ func CreateWebRTCConnection(offerStr, streamKey string, audioPort int, videoPort
 			}(c.conn)
 		}
 
-		ffmpeg.StartFFmpeg(ctx, streamKey, sdpFile, outputType, outputLocation, outputFormat)
+		ffmpeg.StartFFmpeg(ctx, streamKey, sdpFile, destination)
 
 		// Set a handler for when a new remote track starts, this handler will forward data to
 		// our UDP listeners.

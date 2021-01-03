@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
-	"github.com/mohit810/streamingcdn/signal"
+	"github.com/alephcom/streamingcdn/signal"
 )
 
 func main() {
