@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/mohit810/streamingcdn/ffmpeg"
+	"io"
+	"log"
 	"net"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/mohit810/streamingcdn/encryptor"
@@ -17,11 +21,28 @@ type udpConn struct {
 	port int
 }
 
+// WriteToFile will print any string of text to a file safely by
+// checking for errors and syncing at the end.
+func WriteToFile(filename string, data string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.WriteString(file, data)
+	if err != nil {
+		return err
+	}
+	return file.Sync()
+}
+
 // CreateWebRTCConnection function
-func CreateWebRTCConnection(offerStr, streamKey string) (answer webrtc.SessionDescription, err error) {
+func CreateWebRTCConnection(offerStr, streamKey string, audioPort int, videoPort int, outputType string, outputLocation string, outputFormat string) (answer webrtc.SessionDescription, err error) {
 
 	defer func() {
 		if e, ok := recover().(error); ok {
+			err = e
 			err = e
 		}
 	}()
@@ -79,11 +100,37 @@ func CreateWebRTCConnection(offerStr, streamKey string) (answer webrtc.SessionDe
 			cancel()
 		}
 
+		goDir, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		errDir := os.MkdirAll("sdp", 0755)
+		if errDir != nil {
+			log.Fatal(errDir)
+		}
+
+		var sdpFile = "sdp/" + streamKey + ".sdp"
+		errWrite := WriteToFile(goDir + "/" + sdpFile,
+		"v=0\n" +
+		 "o=- 0 0 IN IP4 127.0.0.1\n" +
+		 "s=Pion WebRTC\n" +
+		 "c=IN IP4 127.0.0.1\n" +
+		 "t=0 0\n" +
+		 "m=audio " + strconv.Itoa( audioPort) +  " RTP/AVP 111\n" +
+		 "a=rtpmap:111 OPUS/48000/2\n" +
+		 "m=video " + strconv.Itoa( videoPort) + " RTP/AVP 102\n" +
+		 "a=rtpmap:102 H264/90000")
+
+		if errWrite != nil {
+			log.Fatal(errWrite)
+		}
+
 		// Prepare udp conns
 		udpConns := map[string]*udpConn{
-			"audio": {port: 4000},
-			"video": {port: 4002},
+			"audio": {port: audioPort},
+			"video": {port: videoPort},
 		}
+
 		for _, c := range udpConns {
 			// Create remote addr
 			var raddr *net.UDPAddr
@@ -104,7 +151,7 @@ func CreateWebRTCConnection(offerStr, streamKey string) (answer webrtc.SessionDe
 			}(c.conn)
 		}
 
-		ffmpeg.StartFFmpeg(ctx, streamKey)
+		ffmpeg.StartFFmpeg(ctx, streamKey, sdpFile, outputType, outputLocation, outputFormat)
 
 		// Set a handler for when a new remote track starts, this handler will forward data to
 		// our UDP listeners.
